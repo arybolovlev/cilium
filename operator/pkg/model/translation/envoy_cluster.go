@@ -11,6 +11,7 @@ import (
 	envoy_config_cluster_v3 "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	override_hostv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/load_balancing_policies/override_host/v3"
+	envoy_config_tls_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
 	envoy_upstreams_http_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/upstreams/http/v3"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -140,6 +141,47 @@ func (i *cecTranslator) desiredEnvoyCluster(m *model.Model) ([]ciliumv2.XDSResou
 	}
 
 	return res, nil
+}
+
+func (i *cecTranslator) desiredEnvoySecrets(m *model.Model) ([]ciliumv2.XDSResource, error) {
+	if !usesSystemCA(m) {
+		return nil, nil
+	}
+
+	secret := &envoy_config_tls_v3.Secret{
+		Name: systemCACertificateSecretName,
+		Type: &envoy_config_tls_v3.Secret_ValidationContext{
+			ValidationContext: &envoy_config_tls_v3.CertificateValidationContext{
+				TrustedCa: &envoy_config_core_v3.DataSource{
+					Specifier: &envoy_config_core_v3.DataSource_Filename{
+						Filename: systemCACertificateBundlePath,
+					},
+				},
+			},
+		},
+	}
+	resource, err := toXdsResource(secret, envoy.SecretTypeURL)
+	if err != nil {
+		return nil, err
+	}
+
+	return []ciliumv2.XDSResource{resource}, nil
+}
+
+func usesSystemCA(m *model.Model) bool {
+	for _, listener := range m.HTTP {
+		for _, route := range listener.Routes {
+			for _, backend := range route.Backends {
+				if backend.UsesSystemCA() {
+					return true
+				}
+			}
+			if route.ExternalAuth != nil && route.ExternalAuth.Backend.UsesSystemCA() {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // httpCluster creates a new Envoy cluster.

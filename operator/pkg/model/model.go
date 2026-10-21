@@ -788,6 +788,15 @@ type Backend struct {
 	EndpointPicker *EndpointPicker `json:"endpointPicker,omitempty"`
 }
 
+// UsesSystemCA reports whether TLS origination for this backend uses the
+// system CA bundle.
+func (b *Backend) UsesSystemCA() bool {
+	return b != nil &&
+		b.TLS != nil &&
+		b.TLS.CACertRef == nil &&
+		b.TLS.SNI != ""
+}
+
 // BackendPort holds the details of what port on the Service to connect to.
 // Only one of Port or Name can be set.
 type BackendPort struct {
@@ -806,8 +815,8 @@ type BackendTLSOrigination struct {
 	// This will probably be converted into a reference to a Secret in the secrets
 	// namespace as part of translation.
 	//
-	// If unset, Envoy should originate TLS, but validate the CA certificate using
-	// whatever certificate chains it already has.
+	// If unset, Envoy should originate TLS and validate the peer using the system
+	// CA bundle provided by the Envoy image.
 	CACertRef *FullyQualifiedResource
 
 	// SNI contains the hostname to be sent as the SNI when TLS is originated.

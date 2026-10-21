@@ -19,6 +19,11 @@ import (
 	syncnames "github.com/cilium/cilium/pkg/secretsync/names"
 )
 
+const (
+	systemCACertificateBundlePath = "/etc/ssl/certs/ca-certificates.crt"
+	systemCACertificateSecretName = "system-ca-certificates"
+)
+
 type ClusterMutator func(*envoy_config_cluster_v3.Cluster) *envoy_config_cluster_v3.Cluster
 
 // withClusterLbPolicy sets the cluster's load balancing policy.
@@ -150,19 +155,23 @@ func withTLSOrigination(secretsNamespace string, tls *model.BackendTLSOriginatio
 					TlsParams: &envoy_config_tls.TlsParameters{
 						TlsMaximumProtocolVersion: envoy_config_tls.TlsParameters_TLSv1_3,
 					},
-					ValidationContextType: &envoy_config_tls.CommonTlsContext_ValidationContext{
-						ValidationContext: &envoy_config_tls.CertificateValidationContext{
-							MatchTypedSubjectAltNames: []*envoy_config_tls.SubjectAltNameMatcher{
-								{
-									SanType: envoy_config_tls.SubjectAltNameMatcher_DNS,
-									Matcher: &envoy_type_matcher.StringMatcher{
-										MatchPattern: &envoy_type_matcher.StringMatcher_Exact{
-											Exact: tls.SNI,
+					ValidationContextType: &envoy_config_tls.CommonTlsContext_CombinedValidationContext{
+						CombinedValidationContext: &envoy_config_tls.CommonTlsContext_CombinedCertificateValidationContext{
+							DefaultValidationContext: &envoy_config_tls.CertificateValidationContext{
+								MatchTypedSubjectAltNames: []*envoy_config_tls.SubjectAltNameMatcher{
+									{
+										SanType: envoy_config_tls.SubjectAltNameMatcher_DNS,
+										Matcher: &envoy_type_matcher.StringMatcher{
+											MatchPattern: &envoy_type_matcher.StringMatcher_Exact{
+												Exact: tls.SNI,
+											},
 										},
 									},
 								},
 							},
-							SystemRootCerts: &envoy_config_tls.CertificateValidationContext_SystemRootCerts{},
+							ValidationContextSdsSecretConfig: &envoy_config_tls.SdsSecretConfig{
+								Name: systemCACertificateSecretName,
+							},
 						},
 					},
 				},

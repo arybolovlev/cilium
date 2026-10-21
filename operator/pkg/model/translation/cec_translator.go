@@ -285,9 +285,16 @@ func (i *cecTranslator) desiredResources(m *model.Model) ([]ciliumv2.XDSResource
 	if err != nil {
 		return nil, err
 	}
+
+	secrets, err := i.desiredEnvoySecrets(m)
+	if err != nil {
+		return nil, err
+	}
+
 	res = append(res, listener...)
 	res = append(res, httpRoutes...)
 	res = append(res, clusters...)
+	res = append(res, secrets...)
 
 	return res, nil
 }

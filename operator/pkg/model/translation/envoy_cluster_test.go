@@ -180,7 +180,7 @@ func Test_withTLSOrigination(t *testing.T) {
 		require.Equal(t, syncnames.SyncedConfigMapSDSSecretName("cilium-secrets", types.NamespacedName{Namespace: "my-namespace", Name: "my-ca-configmap"}), sdsName)
 	})
 
-	t.Run("uses system root certificates when no CA ref is configured", func(t *testing.T) {
+	t.Run("uses the system CA bundle when no CA ref is configured", func(t *testing.T) {
 		systemTLS := &model.BackendTLSOrigination{
 			SNI: "my-backend.svc.cluster.local",
 		}
@@ -194,12 +194,11 @@ func Test_withTLSOrigination(t *testing.T) {
 		err := proto.Unmarshal(cluster.TransportSocket.GetTypedConfig().GetValue(), upstreamTLS)
 		require.NoError(t, err)
 
-		validationContext := upstreamTLS.CommonTlsContext.GetValidationContext()
-		require.NotNil(t, validationContext)
+		combined := upstreamTLS.CommonTlsContext.GetCombinedValidationContext()
+		require.NotNil(t, combined)
+		require.Equal(t, systemCACertificateSecretName, combined.GetValidationContextSdsSecretConfig().GetName())
 
-		require.NotNil(t, validationContext.GetSystemRootCerts())
-
-		matchers := validationContext.GetMatchTypedSubjectAltNames()
+		matchers := combined.GetDefaultValidationContext().GetMatchTypedSubjectAltNames()
 		require.Len(t, matchers, 1)
 		require.Equal(t, envoy_config_tls.SubjectAltNameMatcher_DNS, matchers[0].GetSanType())
 		require.Equal(t, systemTLS.SNI, matchers[0].GetMatcher().GetExact())

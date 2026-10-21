@@ -190,12 +190,14 @@ spec:
           commonTlsContext:
             tlsParams:
               tlsMaximumProtocolVersion: TLSv1_3
-            validationContext:
-              match_typed_subject_alt_names:
-                - san_type: DNS
-                  matcher:
-                    exact: "abc.example.com"
-              systemRootCerts: {}
+            combinedValidationContext:
+              defaultValidationContext:
+                match_typed_subject_alt_names:
+                  - san_type: DNS
+                    matcher:
+                      exact: "abc.example.com"
+              validationContextSdsSecretConfig:
+                name: system-ca-certificates
           sni: abc.example.com
       type: EDS
       typedExtensionProtocolOptions:
@@ -236,6 +238,12 @@ spec:
             idleTimeout: 60s
           useDownstreamProtocolConfig:
             http2ProtocolOptions: {}
+
+    - "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+      name: system-ca-certificates
+      validationContext:
+        trustedCa:
+          filename: /etc/ssl/certs/ca-certificates.crt
   services:
     - listener: ""
       name: cilium-gateway-same-namespace
